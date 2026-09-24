@@ -1,0 +1,195 @@
+/* MediaForge AI — Dark Creative Studio Theme */
+
+QMainWindow, QDialog {
+    background-color: #0d0f14;
+    color: #f3f4f6;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    font-size: 13px;
+}
+
+QWidget {
+    background-color: transparent;
+    color: #f3f4f6;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    font-size: 13px;
+    selection-background-color: #6366f1;
+    selection-color: #ffffff;
+}
+
+/* Base Frames & Panels */
+QFrame.card {
+    background-color: #161922;
+    border: 1px solid #282e3f;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+QFrame.card:hover {
+    border: 1px solid #3b435c;
+}
+
+/* Sidebar Styling */
+#sidebar {
+    background-color: #11141c;
+    border-right: 1px solid #222736;
+}
+
+#sidebar QPushButton {
+    background-color: transparent;
+    color: #9ca3af;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+#sidebar QPushButton:hover {
+    background-color: #1a1e2b;
+    color: #ffffff;
+}
+
+#sidebar QPushButton:checked, #sidebar QPushButton.active {
+    background-color: #23283b;
+    color: #818cf8;
+    border-left: 3px solid #6366f1;
+    font-weight: 600;
+}
+
+/* Header & Title Labels */
+QLabel.title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+QLabel.subtitle {
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+QLabel.badge {
+    background-color: #23283b;
+    color: #818cf8;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Buttons */
+QPushButton {
+    background-color: #202533;
+    color: #e5e7eb;
+    border: 1px solid #2d3549;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #2a3144;
+    border-color: #3f4963;
+    color: #ffffff;
+}
+
+QPushButton:pressed {
+    background-color: #191d29;
+}
+
+/* Compact & Icon Buttons */
+QPushButton.compact, QPushButton.icon-btn {
+    padding: 0px 4px;
+}
+
+QPushButton.primary {
+    background-color: #6366f1;
+    color: #ffffff;
+    border: 1px solid #4f46e5;
+    font-weight: 600;
+}
+
+QPushButton.primary:hover {
+    background-color: #4f46e5;
+    border-color: #4338ca;
+}
+
+QPushButton.primary:pressed {
+    background-color: #3730a3;
+}
+
+QPushButton.accent {
+    background-color: #10b981;
+    color: #ffffff;
+    border: 1px solid #059669;
+    font-weight: 600;
+}
+
+QPushButton.accent:hover {
+    background-color: #059669;
+}
+
+/* Progress Bars */
+QProgressBar {
+    background-color: #1a1e2b;
+    border: 1px solid #282e3f;
+    border-radius: 4px;
+    text-align: center;
+    color: #e5e7eb;
+    font-size: 11px;
+    height: 12px;
+}
+
+QProgressBar::chunk {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #818cf8);
+    border-radius: 3px;
+}
+
+/* Resource Bar */
+#resourceBar {
+    background-color: #11141c;
+    border-top: 1px solid #222736;
+    padding: 4px 12px;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #2a3144;
+    min-height: 24px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #3f4963;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #2a3144;
+    min-width: 24px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #3f4963;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
