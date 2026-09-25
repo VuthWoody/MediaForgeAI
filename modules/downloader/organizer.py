@@ -179,7 +179,7 @@ class MediaOrganizer:
                     "SELECT id, title, creator, file_path FROM library WHERE creator = 'Hongguo Drama' OR file_path LIKE '%Hongguo Drama%';"
                 ).fetchall()
 
-                for row_id, title, creator, file_path in rows:
+                for row_id, title, _creator, file_path in rows:
                     p = Path(file_path)
                     drama_name = re.sub(r"\s*第\d+集$", "", title).strip()
                     if not drama_name or drama_name == "Hongguo Drama":
