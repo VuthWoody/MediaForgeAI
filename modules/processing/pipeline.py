@@ -30,6 +30,7 @@ from typing import Any
 
 from core.cancellation import CancellationToken
 from core.exceptions import EngineError
+from core.utils import to_safe_path
 from modules.ai.diarizer import DiarizerEngine, DiarizerInput
 from modules.ai.director import DirectorManager
 from modules.ai.engine import Transcript
@@ -156,7 +157,7 @@ class PipelineEngine:
                 "ffmpeg",
                 "-y",
                 "-i",
-                str(config.video_path),
+                to_safe_path(config.video_path),
                 "-vn",
                 "-acodec",
                 "pcm_s16le",
@@ -164,7 +165,7 @@ class PipelineEngine:
                 "16000",
                 "-ac",
                 "1",
-                str(extracted_audio_path),
+                to_safe_path(extracted_audio_path),
             ]
             res = subprocess.run(cmd_extract, capture_output=True, text=True)
             if res.returncode != 0:
@@ -329,7 +330,7 @@ class PipelineEngine:
             no_vocals_path = workdir / "original_audio.wav"
             if not no_vocals_path.exists():
                 subprocess.run(
-                    ["ffmpeg", "-y", "-i", str(config.video_path), "-vn", "-c:a", "pcm_s16le", str(no_vocals_path)],
+                    ["ffmpeg", "-y", "-i", to_safe_path(config.video_path), "-vn", "-c:a", "pcm_s16le", to_safe_path(no_vocals_path)],
                     capture_output=True,
                 )
 
@@ -418,26 +419,37 @@ class PipelineEngine:
                     v_ch = wf.getnchannels()
                     v_sw = wf.getsampwidth()
 
+                    # Group candidate speech segments per speaker
+                    speaker_candidates: dict[str, list[Any]] = {}
                     for seg in translated_transcript.segments:
                         spk = seg.speaker
-                        if spk in speaker_reference_audios:
-                            continue
+                        if spk not in speaker_candidates:
+                            speaker_candidates[spk] = []
                         dur = seg.end - seg.start
-                        # Pick a clear speech segment (between 1.2s and 8.0s)
-                        if dur >= 1.2:
-                            safe_name = "".join(c if c.isalnum() else "_" for c in spk)[:32]
-                            ref_path = clones_dir / f"ref_{safe_name}.wav"
-                            start_fr = max(0, int(seg.start * v_sr))
-                            cnt = min(wf.getnframes() - start_fr, int(dur * v_sr))
-                            if cnt > 0:
-                                wf.setpos(start_fr)
-                                chunk_bytes = wf.readframes(cnt)
-                                with wave.open(str(ref_path), "wb") as out_rf:
-                                    out_rf.setnchannels(v_ch)
-                                    out_rf.setsampwidth(v_sw)
-                                    out_rf.setframerate(v_sr)
-                                    out_rf.writeframes(chunk_bytes)
-                                speaker_reference_audios[spk] = ref_path
+                        if dur >= 1.5:
+                            speaker_candidates[spk].append(seg)
+
+                    for spk, seg_list in speaker_candidates.items():
+                        if not seg_list:
+                            continue
+                        # Select segment with ideal duration (closest to 3.5 - 5.0s for rich acoustic profile)
+                        seg_list.sort(key=lambda s: abs((s.end - s.start) - 4.0))
+                        best_seg = seg_list[0]
+                        dur = best_seg.end - best_seg.start
+                        safe_name = "".join(c if c.isalnum() else "_" for c in spk)[:32]
+                        ref_path = clones_dir / f"ref_{safe_name}.wav"
+                        start_fr = max(0, int(best_seg.start * v_sr))
+                        cnt = min(wf.getnframes() - start_fr, int(dur * v_sr))
+                        if cnt > 0:
+                            wf.setpos(start_fr)
+                            chunk_bytes = wf.readframes(cnt)
+                            with wave.open(str(ref_path), "wb") as out_rf:
+                                out_rf.setnchannels(v_ch)
+                                out_rf.setsampwidth(v_sw)
+                                out_rf.setframerate(v_sr)
+                                out_rf.writeframes(chunk_bytes)
+                            speaker_reference_audios[spk] = ref_path
+                            logger.info("Extracted actor reference clip for '%s': %s (%.2fs)", spk, ref_path.name, dur)
             except Exception as ex_clone:
                 logger.debug("Notice extracting actor clone reference clips: %s", ex_clone)
 
@@ -451,17 +463,19 @@ class PipelineEngine:
                 continue
 
             out_clip = tts_dir / f"tts_{i:04d}_{seg.id}.wav"
+            ref_audio = speaker_reference_audios.get(seg.speaker)
             cached_meta = cached_clip_manifest.get(str(seg.id), {})
             text_changed = (
                 cached_meta.get("text") != text_to_speak
                 or cached_meta.get("speaker") != seg.speaker
                 or cached_meta.get("emotion") != getattr(seg, "emotion", None)
+                or cached_meta.get("provider") != (config.tts_provider or "voxcpm")
+                or cached_meta.get("cloned") != bool(ref_audio)
             )
 
             if not out_clip.exists() or text_changed or config.force_recompute:
                 if text_changed and out_clip.exists():
                     out_clip.unlink(missing_ok=True)
-                ref_audio = speaker_reference_audios.get(seg.speaker)
                 self.voice_gen.generate_speech(
                     text=text_to_speak,
                     target_lang=config.target_lang,
@@ -477,6 +491,8 @@ class PipelineEngine:
                 "text": text_to_speak,
                 "speaker": seg.speaker,
                 "emotion": getattr(seg, "emotion", None),
+                "provider": config.tts_provider or "voxcpm",
+                "cloned": bool(ref_audio),
             }
             raw_tts_items.append((seg.start, seg.end, out_clip))
 

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.cancellation import CancellationToken
+from core.utils import to_safe_path
 from modules.ai.engine import Transcript, TranscriptSegment
 
 logger = logging.getLogger(__name__)
@@ -220,11 +221,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-i",
-                    str(a_in),
+                    to_safe_path(a_in),
                     "-i",
-                    str(sub_in),
+                    to_safe_path(sub_in),
                     "-map",
                     "0:v:0",
                     "-map",
@@ -242,7 +243,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-metadata:s:s:0",
                     "title=Subtitles",
                     "-shortest",
-                    str(out),
+                    to_safe_path(out),
                 ]
             else:
                 cmd = [
@@ -251,9 +252,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-i",
-                    str(a_in),
+                    to_safe_path(a_in),
                     "-map",
                     "0:v:0",
                     "-map",
@@ -265,7 +266,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-b:a",
                     "192k",
                     "-shortest",
-                    str(out),
+                    to_safe_path(out),
                 ]
         else:
             if has_sub:
@@ -275,9 +276,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-i",
-                    str(sub_in),
+                    to_safe_path(sub_in),
                     "-map",
                     "0:v",
                     "-map",
@@ -292,7 +293,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     sub_codec,
                     "-metadata:s:s:0",
                     "title=Subtitles",
-                    str(out),
+                    to_safe_path(out),
                 ]
             else:
                 cmd = [
@@ -301,7 +302,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-map",
                     "0:v",
                     "-map",
@@ -310,10 +311,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "copy",
                     "-c:a",
                     "copy",
-                    str(out),
+                    to_safe_path(out),
                 ]
 
-        subprocess.run(cmd, check=True, capture_output=True, timeout=180)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        if res.returncode != 0:
+            raise RuntimeError(f"FFmpeg soft-mux failed: {res.stderr}")
         if progress:
             progress(1.0, "Soft-muxing complete.")
         return out
@@ -343,7 +346,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         has_sub = sub_in.exists() and sub_in.stat().st_size > 0
 
         if has_sub:
-            escaped_sub = str(sub_in).replace("\\", "/").replace(":", "\\:")
+            escaped_sub = to_safe_path(sub_in).replace("\\", "/").replace(":", "\\:")
             force_style = st.to_ass_force_style()
             vf_arg = f"subtitles='{escaped_sub}':force_style='{force_style}'"
 
@@ -358,9 +361,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-i",
-                    str(a_in),
+                    to_safe_path(a_in),
                     "-vf",
                     vf_arg,
                     "-map",
@@ -378,7 +381,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-b:a",
                     "192k",
                     "-shortest",
-                    str(out),
+                    to_safe_path(out),
                 ]
             else:
                 cmd = [
@@ -387,7 +390,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-vf",
                     vf_arg,
                     "-c:v",
@@ -398,7 +401,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "20",
                     "-c:a",
                     "copy",
-                    str(out),
+                    to_safe_path(out),
                 ]
         else:
             if audio_path:
@@ -409,9 +412,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-i",
-                    str(a_in),
+                    to_safe_path(a_in),
                     "-map",
                     "0:v:0",
                     "-map",
@@ -423,7 +426,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-b:a",
                     "192k",
                     "-shortest",
-                    str(out),
+                    to_safe_path(out),
                 ]
             else:
                 cmd = [
@@ -432,7 +435,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "-v",
                     "error",
                     "-i",
-                    str(v_in),
+                    to_safe_path(v_in),
                     "-map",
                     "0:v",
                     "-map",
@@ -441,10 +444,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     "copy",
                     "-c:a",
                     "copy",
-                    str(out),
+                    to_safe_path(out),
                 ]
 
-        subprocess.run(cmd, check=True, capture_output=True, timeout=300)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if res.returncode != 0:
+            raise RuntimeError(f"FFmpeg subtitle burn-in failed: {res.stderr}")
         if progress:
             progress(1.0, "Subtitle burn-in complete.")
         return out

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.cancellation import CancellationToken
+from core.utils import to_safe_path
 from modules.media.inspector import MediaInspector
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class AudioAligner:
         meta = MediaInspector.probe(in_p)
         actual_dur = meta.duration if meta.duration > 0 else 1.0
         dt_orig = max(0.2, target_duration)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
 
         overflow = False
         speed_factor = 1.0
@@ -66,16 +68,18 @@ class AudioAligner:
                 "-v",
                 "error",
                 "-i",
-                str(in_p),
+                to_safe_path(in_p),
                 "-filter:a",
                 f"atempo={speed_factor:.3f}",
                 "-c:a",
                 "pcm_s16le",
                 "-ar",
                 "44100",
-                str(out_p),
+                to_safe_path(out_p),
             ]
-            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if res.returncode != 0:
+                raise RuntimeError(f"FFmpeg atempo alignment failed: {res.stderr}")
         else:
             # Pad with silence to match target_duration
             cmd = [
@@ -84,16 +88,18 @@ class AudioAligner:
                 "-v",
                 "error",
                 "-i",
-                str(in_p),
+                to_safe_path(in_p),
                 "-af",
                 f"apad=whole_dur={dt_orig:.3f}",
                 "-c:a",
                 "pcm_s16le",
                 "-ar",
                 "44100",
-                str(out_p),
+                to_safe_path(out_p),
             ]
-            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if res.returncode != 0:
+                raise RuntimeError(f"FFmpeg apad alignment failed: {res.stderr}")
 
         meta_out = MediaInspector.probe(out_p)
         return AlignedClipResult(

@@ -470,6 +470,29 @@ class VoxCPMProvider(TTSProvider):
         )
         tmp_mp3.unlink(missing_ok=True)
 
+        voice_tag = f"voxcpm:{selected_base_voice}:{pitch_str}:{rate_str}"
+
+        # If reference audio is provided, clone the real video actor's voice
+        if reference_audio and Path(reference_audio).exists():
+            try:
+                from modules.ai.voice_cloner import RealVoiceCloner
+
+                cloner = RealVoiceCloner.get_instance()
+                if cloner.is_available:
+                    cloned_tmp = out_path.with_suffix(".cloned_tmp.wav")
+                    cloner.clone_voice(
+                        base_audio_path=out_path,
+                        reference_audio_path=Path(reference_audio),
+                        output_path=cloned_tmp,
+                        tau=0.9,
+                    )
+                    if cloned_tmp.exists() and cloned_tmp.stat().st_size > 1000:
+                        import shutil
+                        shutil.move(str(cloned_tmp), str(out_path))
+                        voice_tag = f"real_voice_clone:{Path(reference_audio).stem}"
+            except Exception as clone_err:
+                logger.warning("Real voice cloning notice: %s", clone_err)
+
         meta = MediaInspector.probe(out_path)
         duration = meta.duration if meta.duration > 0 else 1.0
 
@@ -477,5 +500,5 @@ class VoxCPMProvider(TTSProvider):
             audio_path=out_path,
             duration_sec=duration,
             provider="voxcpm_clone",
-            voice_id=f"voxcpm:{selected_base_voice}:{pitch_str}:{rate_str}",
+            voice_id=voice_tag,
         )

@@ -13,6 +13,7 @@ import numpy as np
 from core.cancellation import CancellationToken
 from core.exceptions import CancelledError
 from modules.ai.engine import Availability, Engine, Transcript, classify_segment_tone
+from modules.ai.voice_cloner import RealVoiceCloner
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,22 @@ class DiarizerEngine(Engine):
             band_energy = float(np.sum(fft_data[mask] ** 2))
             band_energies.append(float(np.log1p(band_energy) / tot_energy))
 
+        # Check if neural speaker embedding is available via RealVoiceCloner
+        try:
+            cloner = RealVoiceCloner.get_instance()
+            if cloner.is_available:
+                neural_emb = cloner.extract_speaker_embedding(samples, sr=sr)
+                if np.any(neural_emb != 0):
+                    f0_scaled = (f0 / 200.0) * 0.8
+                    centroid_scaled = (centroid / 2000.0) * 0.5
+                    combined = np.concatenate([neural_emb, [f0_scaled, centroid_scaled]]).astype(np.float32)
+                    norm = np.linalg.norm(combined)
+                    if norm > 1e-9:
+                        combined /= norm
+                    return combined
+        except Exception as e:
+            logger.debug("Neural embedding extraction notice: %s", e)
+
         feature_vector = np.array(
             [
                 (f0 / 200.0) * 4.5,
@@ -232,7 +249,7 @@ class DiarizerEngine(Engine):
         features: np.ndarray,
         n_clusters: int,
     ) -> list[int]:
-        """Cluster feature vectors into speaker labels using K-Means with K-Means++ initialization."""
+        """Cluster feature vectors into speaker labels using spherical or standard K-Means."""
         n_samples = len(features)
         if n_samples == 0:
             return []
@@ -241,7 +258,50 @@ class DiarizerEngine(Engine):
 
         clamped_clusters = min(n_clusters, n_samples)
 
-        # Standardize features across dimensions
+        # High-dimensional neural embeddings: use spherical / cosine clustering
+        if features.shape[1] >= 64:
+            best_sim_score = -float("inf")
+            best_labels: list[int] = [0] * n_samples
+            rng = np.random.RandomState(42)
+
+            for _ in range(20):
+                first_idx = rng.randint(n_samples)
+                centers = [features[first_idx]]
+                for _ in range(1, clamped_clusters):
+                    cos_sims = np.max([np.dot(features, c) for c in centers], axis=0)
+                    dist = np.clip(1.0 - cos_sims, 0.0, 2.0)
+                    probs = dist / (np.sum(dist) + 1e-12)
+                    next_idx = rng.choice(n_samples, p=probs)
+                    centers.append(features[next_idx])
+                c_mat = np.array(centers)
+
+                curr_labels = np.zeros(n_samples, dtype=int)
+                for _ in range(30):
+                    sims = np.dot(features, c_mat.T)
+                    curr_labels = np.argmax(sims, axis=1)
+                    new_centers = []
+                    for c in range(clamped_clusters):
+                        pts = features[curr_labels == c]
+                        if len(pts) > 0:
+                            mean_c = np.mean(pts, axis=0)
+                            mean_c /= (np.linalg.norm(mean_c) + 1e-12)
+                            new_centers.append(mean_c)
+                        else:
+                            new_centers.append(c_mat[c])
+                    c_new = np.array(new_centers)
+                    if np.allclose(c_mat, c_new, atol=1e-4):
+                        break
+                    c_mat = c_new
+
+                sims = np.dot(features, c_mat.T)
+                score = float(np.mean(np.max(sims, axis=1)))
+                if score > best_sim_score:
+                    best_sim_score = score
+                    best_labels = curr_labels.tolist()
+
+            return best_labels
+
+        # Standard DSP features (low dimension / synthetic tests)
         std = np.std(features, axis=0, keepdims=True)
         std[std < 1e-6] = 1.0
         Z = (features - np.mean(features, axis=0, keepdims=True)) / std

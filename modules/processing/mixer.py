@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from core.cancellation import CancellationToken
+from core.utils import to_safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class AudioMixer:
         filter_inputs: list[str] = []
 
         for idx, (clip_path, start_s) in enumerate(clips):
-            cmd.extend(["-i", str(clip_path)])
+            cmd.extend(["-i", to_safe_path(clip_path)])
             delay_ms = int(round(start_s * 1000))
             filter_inputs.append(f"[{idx}:a]adelay={delay_ms}|{delay_ms}[a{idx}];")
 
@@ -76,10 +77,12 @@ class AudioMixer:
             "pcm_s16le",
             "-ar",
             "44100",
-            str(out_p),
+            to_safe_path(out_p),
         ])
 
-        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if res.returncode != 0:
+            raise RuntimeError(f"FFmpeg dialogue track assembly failed: {res.stderr}")
         return out_p
 
     @classmethod
@@ -121,9 +124,9 @@ class AudioMixer:
             "-v",
             "error",
             "-i",
-            str(b_path),
+            to_safe_path(b_path),
             "-i",
-            str(d_path),
+            to_safe_path(d_path),
             "-filter_complex",
             filter_graph,
             "-map",
@@ -134,10 +137,12 @@ class AudioMixer:
             "pcm_s16le",
             "-ar",
             "44100",
-            str(out_p),
+            to_safe_path(out_p),
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if res.returncode != 0:
+            raise RuntimeError(f"FFmpeg master audio mix failed: {res.stderr}")
         if progress:
             progress(1.0, "Master audio mix complete.")
         return out_p

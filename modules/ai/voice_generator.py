@@ -277,10 +277,38 @@ class VoiceGenerator:
                         emotion_tag=emotion_tag,
                         token=token,
                     )
+                # If reference audio is provided, ensure real actor voice cloning is applied
+                if reference_audio and Path(reference_audio).exists():
+                    try:
+                        from modules.ai.voice_cloner import RealVoiceCloner
+
+                        cloner = RealVoiceCloner.get_instance()
+                        if cloner.is_available and "real_voice_clone" not in getattr(res, "voice_id", ""):
+                            cloned_p = target_out.with_suffix(".cloned.wav")
+                            cloner.clone_voice(
+                                base_audio_path=target_out,
+                                reference_audio_path=Path(reference_audio),
+                                output_path=cloned_p,
+                                tau=0.9,
+                            )
+                            if cloned_p.exists() and cloned_p.stat().st_size > 1000:
+                                import shutil
+
+                                shutil.move(str(cloned_p), str(target_out))
+                                meta_p = MediaInspector.probe(target_out)
+                                res = TTSResult(
+                                    audio_path=target_out,
+                                    duration_sec=meta_p.duration if meta_p.duration > 0 else res.duration_sec,
+                                    provider=res.provider,
+                                    voice_id=f"real_voice_clone:{Path(reference_audio).stem}",
+                                )
+                    except Exception as cl_err:
+                        logger.warning("Post-TTS voice cloning transfer notice: %s", cl_err)
 
                 # Copy to cache if output_wav was provided separately
                 if output_wav and not cached_file.exists():
                     import shutil
+
                     shutil.copy2(target_out, cached_file)
 
                 return res
