@@ -55,10 +55,21 @@ class QwenTranslateProvider(TranslationProvider):
             )
 
         url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-        system_msg = f"你是一名专业的影视配音翻译专家，请将台词翻译成{target_lang}。保留大括号中的表情/导演标签如{{whisper}}、{{laugh}}。"
-        user_msg = f"台词：{text}"
-        if max_chars:
-            user_msg += f"（严格限制在{max_chars}字以内）"
+        if target_lang.lower() in ("km", "khmer"):
+            system_msg = (
+                "You are an expert Cambodian movie dubbing director specializing in Natural Spoken Khmer (ភាសានិយាយភាពយន្តបែបធម្មជាតិ). "
+                "Translate into natural, conversational, fluent cinema Khmer. Avoid literal dictionary phrasing. "
+                "Use conversational pronouns ('ខ្ញុំ / ឯង / ពួកយើង / ឈ្មោះ') and spoken particles (ណ៎, ហ្នឹង, ណា៎, តើ, អត់, ហ្អ៎, ម៉េស, ទេ). "
+                "Preserve director tags in curly braces like {whisper}, {laugh} exactly."
+            )
+            user_msg = f"Dialogue: {text}"
+            if max_chars:
+                user_msg += f" (Keep strictly under {max_chars} chars for lip-sync)"
+        else:
+            system_msg = f"你是一名专业的影视配音翻译专家，请将台词翻译成{target_lang}。保留大括号中的表情/导演标签如{{whisper}}、{{laugh}}。"
+            user_msg = f"台词：{text}"
+            if max_chars:
+                user_msg += f"（严格限制在{max_chars}字以内）"
 
         payload = {
             "model": "qwen-turbo",

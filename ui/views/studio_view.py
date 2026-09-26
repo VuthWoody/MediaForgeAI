@@ -367,7 +367,7 @@ class StudioView(QWidget):
         ps_layout.addWidget(prov_lbl)
 
         self.prov_combo = QComboBox()
-        self.prov_combo.addItem("LibreTranslate (Free)", "libre")
+        self.prov_combo.addItem("Natural Khmer AI (Free)", "libre")
         self.prov_combo.addItem("Gemini 2.0 Flash", "gemini")
         self.prov_combo.addItem("DeepSeek V3", "deepseek")
         self.prov_combo.addItem("Qwen Turbo", "qwen")

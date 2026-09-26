@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from modules.ai.engine import Transcript, TranscriptSegment, classify_segment_tone
+from modules.ai.khmer_localizer import KhmerDialogueLocalizer
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +208,24 @@ class ScriptInspectorWidget(QWidget):
         """)
         self.save_btn.clicked.connect(self.save_edits)
         bar.addWidget(self.save_btn)
+
+        # Naturalize Khmer Button
+        self.naturalize_btn = QPushButton("✨ Naturalize Khmer")
+        self.naturalize_btn.setToolTip("Transform literal/dictionary Khmer translations into fluent, natural spoken dialogue with gender concordance")
+        self.naturalize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #7c3aed;
+                color: #ffffff;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 4px;
+                border: none;
+                font-size: 11px;
+            }
+            QPushButton:hover { background-color: #6d28d9; }
+        """)
+        self.naturalize_btn.clicked.connect(self.naturalize_all_khmer)
+        bar.addWidget(self.naturalize_btn)
 
         # Replace All in Editor Button
         self.replace_all_btn = QPushButton("📥 Replace All in Editor")
@@ -698,6 +717,80 @@ class ScriptInspectorWidget(QWidget):
             padding: 3px 8px;
             border-radius: 4px;
             border: 1px solid #16a34a;
+        """)
+
+    def naturalize_all_khmer(self) -> None:
+        """Upgrade all segment translations in the table to natural spoken conversational Khmer."""
+        if not self.current_transcript or not self._all_segments:
+            return
+
+        modified_count = 0
+        for row in range(self.table.rowCount()):
+            idx_item = self.table.item(row, 0)
+            if not idx_item:
+                continue
+            try:
+                seg_id = int(idx_item.text())
+            except ValueError:
+                continue
+
+            seg = next((s for s in self._all_segments if s.id == seg_id), None)
+            if not seg:
+                continue
+
+            spk_item = self.table.item(row, 2)
+            speaker_name = spk_item.text().strip() if spk_item else seg.speaker
+
+            trans_item = self.table.item(row, 5)
+            curr_text = trans_item.text().strip() if trans_item else seg.target_text
+
+            if curr_text:
+                natural_text = KhmerDialogueLocalizer.naturalize(
+                    curr_text,
+                    speaker_name=speaker_name,
+                )
+                if natural_text != curr_text:
+                    modified_count += 1
+                    seg.target_text = natural_text
+                    if trans_item:
+                        trans_item.setText(natural_text)
+                    self._invalidate_tts_clip(seg.id)
+
+        # Save to companion JSON if available
+        if self.current_json_path and self.current_json_path.exists():
+            try:
+                self.current_transcript.save_json(self.current_json_path)
+            except Exception as e:
+                logger.debug("Could not auto-save JSON on naturalize: %s", e)
+
+        self.transcript_updated.emit(self.current_transcript)
+
+        # Visual feedback on button
+        orig_text = self.naturalize_btn.text()
+        orig_style = self.naturalize_btn.styleSheet()
+        self.naturalize_btn.setText("✅ Naturalized!")
+        self.naturalize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #15803d;
+                color: #ffffff;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 4px;
+                border: 1px solid #22c55e;
+                font-size: 11px;
+            }
+        """)
+        QTimer.singleShot(2000, lambda: self._reset_btn(self.naturalize_btn, orig_text, orig_style))
+
+        self.stats_badge.setText(f"✨ Naturalized {modified_count} lines into Natural Khmer")
+        self.stats_badge.setStyleSheet("""
+            background-color: #4c1d95;
+            color: #c4b5fd;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #8b5cf6;
         """)
 
     def _apply_filters(self) -> None:

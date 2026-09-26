@@ -58,14 +58,39 @@ class GeminiTranslateProvider(TranslationProvider):
                 target_lang=target_lang,
             )
 
-        prompt = (
-            f"You are a professional film dialogue translator for dubbing into {target_lang}. "
-            f"Translate the following line faithfully and idiomatically. "
-            f"Preserve all expressive tags exactly in curly braces like {{whisper}}, {{laugh}}, {{sigh}} if present. "
-        )
-        if max_chars:
-            prompt += f"Keep the translation concise, strictly under {max_chars} characters for lip synchronization. "
-        prompt += f"\n\nSource text: {text}\nTranslation only, no quotes, no explanations:"
+        if target_lang.lower() in ("km", "khmer"):
+            prompt = (
+                "You are an expert Cambodian movie dubbing director and senior localization translator specializing in "
+                "Natural Spoken Khmer (ភាសានិយាយភាពយន្តបែបធម្មជាតិ).\n"
+                "CRITICAL INSTRUCTIONS FOR NATURAL KHMER:\n"
+                "1. NO LITERAL DICTIONARY TRANSLATIONS: Translate idiomatically as spoken in modern films and real life.\n"
+                "   - 'Oh my god' -> 'អូព្រះអើយ!' / 'អូហូ!' (never 'ឱព្រះជាម្ចាស់អើយ').\n"
+                "   - 'I am good / doing well' -> 'ខ្ញុំសុខសប្បាយធម្មតាទេ' / 'សុខសប្បាយតើ' (never 'ខ្ញុំល្អណាស់').\n"
+                "   - 'I am amazing' -> 'សប្បាយចិត្តខ្លាំងណាស់!' / 'អេមម៉ង!' (never 'ខ្ញុំអស្ចារ្យណាស់').\n"
+                "   - 'Take a seat / this seat is empty' -> 'អង្គុយទីនេះមក កៅអីនេះទំនេរតើ!' (never 'យកកៅអី').\n"
+                "   - 'Long time no see' -> 'ខានជួបគ្នាយូរណាស់ហើយណ៎!' (never 'យូរ។ ឥឡូវឃើញទេ?').\n"
+                "   - 'What about you?' -> 'ចុះឯងវិញ?' (never robotic 'ចុះអ្នកវិញ?').\n"
+                "   - 'Take care / You too' -> 'មើលថែខ្លួនផងណា៎! / ឯងក៏ដូចគ្នាដែរណា៎!' (never 'យកចិត្តទុកដាក់').\n"
+                "2. CONVERSATIONAL PRONOUNS & PARTICLES:\n"
+                "   - Use natural spoken pronouns ('ខ្ញុំ / ឯង / ពួកយើង / ឈ្មោះតួអង្គ'), avoid cold formal 'អ្នក'.\n"
+                "   - Include authentic spoken particles ('ណ៎, ហ្នឹង, ណា៎, តើ, អត់, ហ្អ៎, ម៉េស, ទេ') for natural cadence.\n"
+                "   - Female characters use 'ចាស / ចា៎', Male characters use 'បាទ'.\n"
+                "3. CONCISENESS & TIMING:\n"
+                "   - Keep translation punchy and natural for voice dubbing"
+                + (f", strictly under {max_chars} characters for lip synchronization." if max_chars else ".")
+                + "\nPreserve all tags in curly braces exactly like {whisper}, {laugh}, {sigh} if present.\n"
+                f"\nSource text: {text}\n"
+                "Translation only, no quotes, no explanations:"
+            )
+        else:
+            prompt = (
+                f"You are a professional film dialogue translator for dubbing into {target_lang}. "
+                f"Translate the following line faithfully and idiomatically. "
+                f"Preserve all expressive tags exactly in curly braces like {{whisper}}, {{laugh}}, {{sigh}} if present. "
+            )
+            if max_chars:
+                prompt += f"Keep the translation concise, strictly under {max_chars} characters for lip synchronization. "
+            prompt += f"\n\nSource text: {text}\nTranslation only, no quotes, no explanations:"
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
         payload = {

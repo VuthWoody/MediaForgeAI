@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from core.cancellation import CancellationToken
 from modules.ai.engine import Transcript, TranscriptSegment
+from modules.ai.khmer_localizer import KhmerDialogueLocalizer
 from modules.ai.providers.base import TranslationProvider, TranslationResult
 from modules.ai.providers.deepseek_translate import DeepSeekTranslateProvider
 from modules.ai.providers.gemini_translate import GeminiTranslateProvider
@@ -77,6 +78,8 @@ class DirectorManager:
         max_chars: int | None = None,
         token: CancellationToken | None = None,
         preferred_provider: str | None = None,
+        speaker_gender: str = "auto",
+        speaker_name: str | None = None,
     ) -> TranslationResult:
         """Translate a single line trying providers according to the locked routing table."""
         tags = self.extract_tags(text)
@@ -84,6 +87,8 @@ class DirectorManager:
         providers_order = route_translate()
         if preferred_provider and preferred_provider in self.providers:
             providers_order = [preferred_provider] + [p for p in providers_order if p != preferred_provider]
+
+        result: TranslationResult | None = None
 
         for provider_name in providers_order:
             provider = self.providers.get(provider_name)
@@ -99,7 +104,7 @@ class DirectorManager:
                 continue
 
             try:
-                result = provider.translate(
+                res = provider.translate(
                     text=text,
                     source_lang=source_lang,
                     target_lang=target_lang,
@@ -107,18 +112,29 @@ class DirectorManager:
                     director_tags=tags,
                     token=token,
                 )
-                if result.translated_text and result.translated_text != text:
-                    return result
+                if res.translated_text and res.translated_text != text:
+                    result = res
+                    break
             except Exception as e:
                 logger.warning("Provider %s failed translation: %s; trying next.", provider_name, e)
 
-        # Fallback to original text if all failed
-        return TranslationResult(
-            translated_text=text,
-            provider="fallback",
-            source_lang=source_lang,
-            target_lang=target_lang,
-        )
+        if not result:
+            result = TranslationResult(
+                translated_text=text,
+                provider="fallback",
+                source_lang=source_lang,
+                target_lang=target_lang,
+            )
+
+        # Automatic Natural Conversational Khmer Post-Processing
+        if target_lang.lower() in ("km", "khmer") and result.translated_text:
+            result.translated_text = KhmerDialogueLocalizer.naturalize(
+                result.translated_text,
+                speaker_gender=speaker_gender,
+                speaker_name=speaker_name,
+            )
+
+        return result
 
     def translate_transcript(
         self,
@@ -145,6 +161,8 @@ class DirectorManager:
 
             dt_orig = max(0.5, seg.end - seg.start)
             max_chars = self.calculate_max_chars(dt_orig, target_lang)
+            spk = getattr(seg, "speaker", None)
+            gender = KhmerDialogueLocalizer.detect_gender(spk)
 
             res = self.translate_line(
                 text=seg.source_text,
@@ -153,6 +171,8 @@ class DirectorManager:
                 max_chars=max_chars,
                 token=token,
                 preferred_provider=effective_provider,
+                speaker_gender=gender,
+                speaker_name=spk,
             )
 
             seg.target_text = res.translated_text

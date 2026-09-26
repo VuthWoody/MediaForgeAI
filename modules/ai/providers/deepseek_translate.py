@@ -55,13 +55,21 @@ class DeepSeekTranslateProvider(TranslationProvider):
             )
 
         url = "https://api.deepseek.com/chat/completions"
-        system_prompt = (
-            f"You are a film dialogue translator into {target_lang}. "
-            "Output JSON with key 'translation'. Preserve director tags in curly braces exactly."
-        )
+        if target_lang.lower() in ("km", "khmer"):
+            system_prompt = (
+                "You are an expert Cambodian movie dubbing director specializing in Natural Spoken Khmer (ភាសានិយាយភាពយន្តបែបធម្មជាតិ). "
+                "Translate into natural, conversational, fluent cinema Khmer. Avoid literal dictionary phrasing (no 'ខ្ញុំល្អណាស់', no 'យកកៅអី', no 'ឱព្រះជាម្ចាស់អើយ'). "
+                "Use conversational pronouns ('ខ្ញុំ / ឯង / ពួកយើង / ឈ្មោះ'), spoken particles (ណ៎, ហ្នឹង, ណា៎, តើ, អត់, ហ្អ៎, ម៉េស, ទេ), and female 'ចាស' / male 'បាទ'. "
+                "Output JSON with key 'translation'. Preserve director tags in curly braces exactly."
+            )
+        else:
+            system_prompt = (
+                f"You are a film dialogue translator into {target_lang}. "
+                "Output JSON with key 'translation'. Preserve director tags in curly braces exactly."
+            )
         user_prompt = f"Text: {text}"
         if max_chars:
-            user_prompt += f" (Keep under {max_chars} chars)"
+            user_prompt += f" (Keep under {max_chars} chars for lip-sync)"
 
         payload = {
             "model": "deepseek-chat",
